@@ -1,29 +1,11 @@
 # Scripts
 
-## `fix-claudekit-hooks-for-codex.mjs`
+Reusable agent-maintenance scripts live in their own folders so new scripts can
+be added without mixing docs, fixtures, and helper files.
 
-Repairs ClaudeKit-generated hooks after they are ported from Claude Code hooks
-to Codex hooks.
+## Catalog
 
-The fixer handles both scopes:
-
-```bash
-# Global Codex hooks: ~/.codex/hooks.json and ~/.codex/hooks
-node scripts/fix-claudekit-hooks-for-codex.mjs --global
-
-# Project Codex hooks: <project>/.codex/hooks.json and <project>/.codex/hooks
-node scripts/fix-claudekit-hooks-for-codex.mjs --project --project-dir /path/to/project
-
-# Check without writing
-node scripts/fix-claudekit-hooks-for-codex.mjs --project --dry-run
-```
-
-What it fixes:
-
-- Removes missing or duplicate hook commands from `hooks.json`.
-- Scrubs unsupported `permissionDecision: "allow"` output.
-- Keeps valid `permissionDecision: "deny"` block output.
-- Emits `{}` for successful allow-through hook paths where Codex expects JSON.
-- Patches `descriptive-name.cjs` allow-through output.
-- Patches `scout-block/pattern-matcher.cjs` so current-directory path `.` is not treated as a blockable path.
+| Folder | Purpose |
+| --- | --- |
+| [`claudekit-hooks-for-codex`](./claudekit-hooks-for-codex/) | Fix ClaudeKit-generated hooks after they are ported from Claude Code hooks to Codex hooks. |
 
