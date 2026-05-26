@@ -8,6 +8,9 @@ to Codex hooks.
 The fixer handles both scopes:
 
 ```bash
+# Detect first, no writes
+node scripts/claudekit-hooks-for-codex/fix-claudekit-hooks-for-codex.mjs --detect --project --project-dir /path/to/project
+
 # Global Codex hooks: ~/.codex/hooks.json and ~/.codex/hooks
 node scripts/claudekit-hooks-for-codex/fix-claudekit-hooks-for-codex.mjs --global
 
@@ -17,6 +20,13 @@ node scripts/claudekit-hooks-for-codex/fix-claudekit-hooks-for-codex.mjs --proje
 # Check without writing
 node scripts/claudekit-hooks-for-codex/fix-claudekit-hooks-for-codex.mjs --project --dry-run
 ```
+
+Modes:
+
+- `--detect` or `--mode detect`: scan and report `issueCount`,
+  `hasIssues`, and `wouldChange` without writing files.
+- `--fix` or `--mode fix`: apply fixes; this is the default.
+- `--dry-run`: preview fix-mode writes without writing files.
 
 ## Root Cause
 

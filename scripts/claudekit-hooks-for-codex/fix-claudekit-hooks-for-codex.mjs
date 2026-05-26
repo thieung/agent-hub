@@ -12,7 +12,8 @@ const allChanges = [];
 
 function usage() {
   return `Usage:
-  ${TOOL_NAME} [--scope global|project|all|auto] [--dry-run]
+  ${TOOL_NAME} [--scope global|project|all|auto] [--mode detect|fix] [--dry-run]
+  ${TOOL_NAME} --detect --project [--project-dir /path/to/repo]
   ${TOOL_NAME} --global
   ${TOOL_NAME} --project [--project-dir /path/to/repo]
 
@@ -27,9 +28,12 @@ Scopes:
   auto     Prefer project scope when .codex hooks exist, else global
 
 Options:
+  --mode <detect|fix>   Detect issues first or apply fixes, default: fix
+  --detect, --check     Alias for --mode detect
+  --fix                 Alias for --mode fix
   --codex-home <path>   Override global Codex home
   --project-dir <path>  Override project directory for project scope
-  --dry-run             Report changes without writing
+  --dry-run             Preview fix-mode writes without writing
   --help                Show this help
 `;
 }
@@ -37,6 +41,7 @@ Options:
 function parseArgs(argv) {
   const parsed = {
     scope: "global",
+    mode: "fix",
     dryRun: false,
     codexHome: process.env.CODEX_HOME || path.join(os.homedir(), ".codex"),
     projectDir: process.cwd(),
@@ -51,6 +56,25 @@ function parseArgs(argv) {
     }
     if (arg === "--dry-run") {
       parsed.dryRun = true;
+      continue;
+    }
+    if (arg === "--detect" || arg === "--check") {
+      parsed.mode = "detect";
+      continue;
+    }
+    if (arg === "--fix") {
+      parsed.mode = "fix";
+      continue;
+    }
+    if (arg === "--mode") {
+      const value = argv[index + 1];
+      if (!value) throw new Error("--mode requires a value");
+      parsed.mode = value;
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("--mode=")) {
+      parsed.mode = arg.slice("--mode=".length);
       continue;
     }
     if (arg === "--global") {
@@ -105,6 +129,9 @@ function parseArgs(argv) {
   if (!["global", "project", "all", "auto"].includes(parsed.scope)) {
     throw new Error(`Unsupported scope: ${parsed.scope}`);
   }
+  if (!["detect", "fix"].includes(parsed.mode)) {
+    throw new Error(`Unsupported mode: ${parsed.mode}`);
+  }
 
   parsed.codexHome = path.resolve(expandHome(parsed.codexHome));
   parsed.projectDir = path.resolve(expandHome(parsed.projectDir));
@@ -115,8 +142,12 @@ function readText(filePath) {
   return fs.readFileSync(filePath, "utf8");
 }
 
+function writesEnabled() {
+  return args.mode === "fix" && !args.dryRun;
+}
+
 function backupFile(filePath) {
-  if (args.dryRun || !fs.existsSync(filePath)) return;
+  if (!writesEnabled() || !fs.existsSync(filePath)) return;
   fs.copyFileSync(filePath, `${filePath}.${stamp}.bak`);
 }
 
@@ -124,7 +155,7 @@ function writeIfChanged(target, filePath, nextContent, reason) {
   const current = readText(filePath);
   if (current === nextContent) return false;
   backupFile(filePath);
-  if (!args.dryRun) fs.writeFileSync(filePath, nextContent);
+  if (writesEnabled()) fs.writeFileSync(filePath, nextContent);
   recordChange(target, filePath, reason);
   return true;
 }
@@ -237,7 +268,7 @@ function cleanHooksJson(target, config) {
 
   if (!changed) return false;
   backupFile(target.hooksJsonPath);
-  if (!args.dryRun) fs.writeFileSync(target.hooksJsonPath, `${JSON.stringify(next, null, 2)}\n`);
+  if (writesEnabled()) fs.writeFileSync(target.hooksJsonPath, `${JSON.stringify(next, null, 2)}\n`);
   return true;
 }
 
@@ -422,7 +453,11 @@ function fixTarget(target) {
       skipped: true,
       reason: "missing hooks.json and hooks directory",
       changed: 0,
+      wouldChange: 0,
+      issueCount: 0,
+      hasIssues: false,
       changes: [],
+      issues: [],
     };
   }
 
@@ -443,8 +478,12 @@ function fixTarget(target) {
     hooksJsonPath: fs.existsSync(target.hooksJsonPath) ? target.hooksJsonPath : null,
     hooksDir: fs.existsSync(target.hooksDir) ? target.hooksDir : null,
     skipped: false,
-    changed: changes.length,
+    changed: writesEnabled() ? changes.length : 0,
+    wouldChange: writesEnabled() ? 0 : changes.length,
+    issueCount: changes.length,
+    hasIssues: changes.length > 0,
     changes,
+    issues: changes,
   };
 }
 
@@ -460,9 +499,14 @@ function main() {
   console.log(JSON.stringify({
     tool: TOOL_NAME,
     purpose: "Fix ClaudeKit hooks ported from Claude Code so they run cleanly on Codex",
+    mode: args.mode,
     dryRun: args.dryRun,
+    writesEnabled: writesEnabled(),
     requestedScope: args.scope,
-    changed: allChanges.length,
+    changed: writesEnabled() ? allChanges.length : 0,
+    wouldChange: writesEnabled() ? 0 : allChanges.length,
+    issueCount: allChanges.length,
+    hasIssues: allChanges.length > 0,
     results,
   }, null, 2));
 }
